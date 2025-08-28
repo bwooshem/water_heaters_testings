@@ -1,4 +1,9 @@
-# CTA2045 UCM C++ Library v.1.00
+# CTA2045 UCM C++ Library v.1.00.
+
+If launching using the `CTA2045_UCM_Installer` and `launcher.py`, the `sample2` with debug is automatically built/compiled in the process. `sample2` is run as part of `launcher.py`, but can also be run manually if needed. 
+
+__Original documentation and code below:__
+
 Copyright (c) 2016, Electric Power Research Institute (EPRI)
 All rights reserved.
 

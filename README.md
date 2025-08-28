@@ -1,99 +1,81 @@
-## Current Water Heaters Installed:
-- WH 1: State HPWH
-- WH 2: Rheem HPWH
-- WH 3: AO Smith 2 HPWH
-- WH 4: AO Smith 1 HPWH
-### Requirements:
-NOTE: The water draw scripts are compatible with Python2.
+# CTA-2045 UCM with Raspberry Pi Libraries
 
-- Update the Raspberry Pi Libraries:
-    - ```sudo apt update```
-    - ```sudo apt upgrade```
-    - ```sudo apt install vim```
-    - ```sudo apt install tmux```
+Software package to use a Raspberry Pi as a CTA-2045 UCM for a grid-connected water heater.
 
-- Install WiringPi:
-    - ``` wget https://project-downloads.drogon.net/wiringpi-latest.deb```
-    - ``` sudo dpkg -i wiringpi-latest.deb```
+### Key features
+- Installation script to quickly install all dependencies and compile the code
+- Basic scheduling tool 
 
-- If you get a warning that looks like...
-    - ```WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!```
-    - Use the following ssh line to remove the offending key:
-    - ```ssh-keygen -R <RPI ip address>```
-    - You should be able to log in without issue after entering this line.
+_Please note this is a pre-alpha proof of concept demonstration, and it has only been tested once. There may be bugs or glitches._
 
-### Conformance Test Procedure
-NOTE: The following scripts will run from three windows via TMUX.
-It is important to run programs from RPI desktop so that they may
-run continuously. Running programs from SSH may have issues with
-continuous connectivity.
+## Requirements
+1. Raspberry Pi: We tested with 3B+ and other models _should_ work
+    1. MicroSD card, at least 32 GB
+    2. Computer monitor & display cables to the Pi (it may also be possible to SSH to the Pi)
+    3. Mouse & keyboard
+    4. Power supply
+2. [USB to RS-485 adapter](https://www.amazon.com/dp/B081MB6PN2)
+3. AWG 22 wire. Note: for short lengths (<10cm) between the adapter and the port on the water heater, it should work fine with regular wire. Longer lengths are recommended to use shielded wire to prevent signal interference. If purchasing shielded wire, only 2 strands are necessary. 
+5. CTA-2045 compatible water heater (may work with other SGD)
 
-Three scripts need to run simultaneously to collect all necessary data
-for Conformance testing. Conformance testing runs for 48 hours. The first
-24 hours will use a draw profile. The second 24 hours, the WH will idle.
+## Installation
 
-There are 
+1. Use [Raspberry PI Imager](https://www.raspberrypi.com/software/operating-systems/) from another computer to install Raspbian/Raspberry Pi OS with Desktop, 32-bit (Tested with the version from 13 May 2025, Kernel 6.12, Debian 12). Other versions probably will work too.
+    - When setting it up, the username must be “pi”. If you use another username, something in the C++ code will fail later on. You can fix that by creating a new user called “pi”, but then adjusting all the sudoer and auto login permissions is a pain so best to just start with a user called “pi”. The name of the Raspberry Pi device can be anything. 
 
-The following are the three scripts and run procedures:
-- TMUX - running programs from one terminal
-      - On the RPI Desktop, open a window and run TMUX. You will need to create three
-      separate windows to run the three programs.
+3. Connect the Raspberry Pi to a power supply, display, mouse, and keyboard. Insert the SD card. 
+4. Download or clone this repo. For best results, make sure it is under `/home/pi/water_heaters_testings`
+5. Run the installation script and follow the prompts there. 
+```bash
+cd water_heaters_testings
+sudo bash CTA2045_UCM_Installer.sh
+```
+6. Restart the Raspberry Pi
+7. Assemble the system as shown in the figure below. 
+    - Pin 1: B- (blue wire in the photo)
+    - Pin 7: A+ (green wire in the photo)
 
-      - ```tmux```
-  
-      -ctrl+b, %
-  
-      -ctrl+b, "
-  
-      - To move from window to window: cntrol+b, <up> or <down> or <left> or <right>
-      - To close out tmux: ctrl+b, :kill-session
-  
-- Commodity Service - Collecting WH data from the commodity read
-    - Conformance commodity service initiates data collection for any desired mode.
-    At the start of the program, you will enter the WH Brand (if it is a HP, write
-    HP after brand name), tank volume, and which service you would like to run for
-    48 hours each. The data will be collected in the log.csv file as long as it
-    is running.
-      
-      -```cd water_heaters_testings/dcs/build/debug```
-      
-      -```python3 StartCommodity.py```
-      
-- Draw Profile - Running a 24-hr draw schedule for each service
-    - The draw profile is used to run scheduled water draws by reading CSV files
-    The draw controller program has three inputs for draw schedules:
-      -Daily draw schedule (Use this one to run the test)
-      -Cold water dump, peripheral (Use this one to initialize the cold water
-      temperature for an auxiliary WH)
-      - Test program (create a sample CSV file to ensure all programs are functioning)
-      
-      -```cd water_heaters_testings_/controller```
-      
-      -```./StartDrawSchedule.sh```
-      
-      - Choose which profile you would like to run.
+![Photo of wiring for Raspberry Pi, RS-485, and CTA-2045](https://github.com/bwooshem/water_heaters_testings/blob/main/docs/pi-to-water-heater-via-s485-connections.png)
 
-- Temperature Sensors - Collecting ambient, cold water, and hot water temperatures
-    - Three temperatures are collected. You will need to run one temperature script
-    to collect all three. The temperature data will be saved to the templog directory.
+## Usage
 
-    -```cd water_heaters_testings/dcs```
-  
-    -```python3 GetTemp.py```
+### Mode Options
 
+| Mode | Letter | Code | Notes | 
+| -- | -- | -- | -- | 
+| CriticalPeakEvent | c | 5 | -- | 
+| EndShed | e | 6 | Returns system to default mode |
+| Shed | s | 7 | -- |
+| GridEmergency | g | 8 | Shuts all heating elements |
+| Loadup | l | 9 | -- |
+| OutsideCommunication  | o | 10 | Send this first to initialize receiving signals (performed automatically in the launcher script) |
 
-### If the heartbeat is not working on the DCM or the testbench RPI:
-Check the serial port connections. You can change where serial0 is pointing by
-going to the main.cpp file in water_heaters_testings/dcs/sample2/sample2/main.cpp
-If you update this pointer, you will need to recompile from the dcs repo again and recreate
-and make the build/debug directories.
+### Setting a schedule
+Create (or edit) the file called `demo_schedule.csv`. The file should have 2 columns, "Time Elapsed" in seconds, and "Mode". The launcher will run the mode listed after the specified time since the start of the run has elapsed. For example, in the table below, it will run "l" for load up at 30s, "s" for shed at 120s, and "c" for critical peak at 360s. Note that it will keep sending the last mode in the file indefinitely. For a mode left running for more than 5 minutes, the code re-sends the mode every 5 minutes to ensure the water heater keeps the mode setting. 
 
-- DCM --> serial0 should be pointing to AMA0
-  - If there is still an issue, make sure the RPI README. In particular,
-  make sure to read through the following:
+| Time Elapsed \[s\] | Mode |
+| -- | -- |
+| 30 | l |
+| 120 | s |
+| 360 | c |
+| ... | ... |
 
-    -```https://github.com/rcdrones/UPSPACK_V3/blob/master/README_en.md```
-    
-- Test Bench --> serial0 should be pointing to USB0
+### Running the launcher script
+```bash
+cd water_heaters_testings
+sudo python3 launcher.py
+```
 
+The launcher script will follow the schedule specified in demo_schedule.csv
 
+#### Known Issues & Future Additions
+- Sometimes the signals are not properly received by the device. If so, the code will report `app nak received`. The launcher will reattempt up to 3 times, after which it will crash. So far, the only reliable solution is to restart the Pi and the SGD.
+- Signals are only sent when certain outputs are received from the UCM C++ code, typically every 1 minute. When multiple signals are within 60s of each other, sometimes the first signal doesn't get sent. Signals are delayed until the outputs are received, so it may occur up to 60s after when it was initially intended to run.
+- Currently only supports a few CTA-2045A signals.
+- Future work includes adding AdvancedLoadUp and the ability to query the water heater for current status. 
+
+## Acknowledgements
+
+This package is based on the [water_heaters_testings project by Portland State Power Lab](https://github.com/PortlandStatePowerLab/water_heaters_testings)
+
+The [CTA-2045 UCM C++ Library](https://github.com/epri-dev/CTA-2045-UCM-CPP-Library.git) was originally developed by EPRI
