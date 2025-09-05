@@ -10,11 +10,11 @@ _Please note this is a pre-alpha proof of concept demonstration, and it has only
 
 ## Requirements
 1. Raspberry Pi: We tested with 3B+ and other models _should_ work
-    1. MicroSD card, at least 32 GB
+    1. MicroSD card, at least 32 GB (~$10)
     2. Computer monitor & display cables to the Pi (it may also be possible to SSH to the Pi)
     3. Mouse & keyboard
-    4. Power supply
-2. [USB to RS-485 adapter](https://www.amazon.com/dp/B081MB6PN2)
+    4. Power supply (~$10)
+2. [USB to RS-485 adapter](https://www.amazon.com/dp/B081MB6PN2) (~$15)
 3. AWG 22 wire. Note: for short lengths (<10cm) between the adapter and the port on the water heater, it should work fine with regular wire. Longer lengths are recommended to use shielded wire to prevent signal interference. If purchasing shielded wire, only 2 strands are necessary. 
 5. CTA-2045 compatible water heater (may work with other SGD)
 
@@ -68,6 +68,72 @@ sudo python3 launcher.py
 
 The launcher script will follow the schedule specified in demo_schedule.csv
 
+
+#### Example Operation
+
+ The Launcher script has series of command line/terminal outputs to indicate current status. Sections with the tag `[Launcher]` are outputs created by the launcher script. Those with the tag `[UCM Output]` are from the UCM C++ code. There may be a lot of other outputs not shown here that are not relevant.
+
+ When first started, the launcher will show the following output (with different timestamps).
+
+```text
+[Launcher] Beginning UCM Launcher Code. To exit program, use Ctrl + c 
+[Launcher] Starting 'sudo dcs/build/debug/sample2' as a subprocess...
+[Launcher] UCM process started...
+[UCM Output] 2025-08-28 12:04:35,867 INFO  [default] starting commodity service...
+[UCM Output] 2025-08-28 12:04:36,012 INFO  [default] ack received: 16
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default] message type supported received: 2
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default] commodity response received.  count: 3
+```
+It will show a block of telemetry outputs at the start and again every 1 minute. These are generally not needed.
+```text
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default] commodity data: 0
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default]         code: 0
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default]   cumulative: 0
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default]    inst rate: 0
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default] commodity data: 1
+[UCM Output] 2025-08-28 12:04:36,140 INFO  [default]         code: 6
+[UCM Output] 2025-08-28 12:04:36,141 INFO  [default]   cumulative: 726
+[UCM Output] 2025-08-28 12:04:36,141 INFO  [default]    inst rate: 0
+[UCM Output] 2025-08-28 12:04:36,141 INFO  [default] commodity data: 2
+[UCM Output] 2025-08-28 12:04:36,141 INFO  [default]         code: 7
+[UCM Output] 2025-08-28 12:04:36,141 INFO  [default]   cumulative: 375
+[UCM Output] 2025-08-28 12:04:36,141 INFO  [default]    inst rate: 0
+[UCM Output] 2025-08-28 12:04:36,331 INFO  [default] ack received: 13
+[UCM Output] 2025-08-28 12:04:36,443 INFO  [default] operational state received 4
+```
+When it is ready to accept a command, it displays this menu (sometimes a glitch will cause it to show the menu multiple times)
+```text
+[UCM Output] c- CriticalPeakEvent
+[UCM Output] e- Endshed
+[UCM Output] g- GridEmergency
+[UCM Output] l- Loadup
+[UCM Output] o- OutsideCommunication
+[UCM Output] s- Shed
+[UCM Output] q- Quit
+[UCM Output] enter choice: 
+```
+
+At the start, the launcher must send the 'o' signal to initialize
+```text
+[Launcher] Sending o- OutsideCommunication to initialize...
+```
+
+When initialization is complete, it will display the following output. The schedule is a list of times (in seconds from the start) followed by the list of corresponding commands. 
+```text
+[Launcher] Successfully initialized :)
+[Launcher] Beginning sending signals using following schedule: 
+[30.0, 65.0, 90.0, 150.0, 220.0]
+['s', 'l', 'g', 'e', 'c']
+```
+
+When it sends a given signal, the launcher will show the following message. The UCM responds with `app ack received` if it was able to successfully run the command. (note that on rare occasions, it will say `app nak received`, indicating it did not run the command - in those cases, the Launcher will attempt to resend the command until it works).
+```text
+[Launcher] Sending 'g' to subprocess...
+[UCM Output] 2025-08-28 12:07:38,532 INFO  [default] ack received: 8
+[UCM Output] 2025-08-28 12:07:38,628 INFO  [default] app ack received
+```
+
+
 #### Known Issues & Future Additions
 - Sometimes the signals are not properly received by the device. If so, the code will report `app nak received`. The launcher will reattempt up to 3 times, after which it will crash. So far, the only reliable solution is to restart the Pi and the SGD.
 - Signals are only sent when certain outputs are received from the UCM C++ code, typically every 1 minute. When multiple signals are within 60s of each other, sometimes the first signal doesn't get sent. Signals are delayed until the outputs are received, so it may occur up to 60s after when it was initially intended to run.
@@ -76,6 +142,6 @@ The launcher script will follow the schedule specified in demo_schedule.csv
 
 ## Acknowledgements
 
-This package is based on the [water_heaters_testings project by Portland State Power Lab](https://github.com/PortlandStatePowerLab/water_heaters_testings)
+This software package is based on the [water_heaters_testings project by Portland State Power Lab](https://github.com/PortlandStatePowerLab/water_heaters_testings)
 
 The [CTA-2045 UCM C++ Library](https://github.com/epri-dev/CTA-2045-UCM-CPP-Library.git) was originally developed by EPRI
